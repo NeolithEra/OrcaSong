@@ -37,6 +37,9 @@ class FieldPlotter:
         0 : No centering.
         1 : Center with median of triggered hits.
         2 : Center with median of all hits.
+    add_t0 : bool
+        If True, add the t0 calibration to the time. Only makes sense
+        for field=="time" obviously.
     data : ndarray
         The extracted data.
     n_events : int
@@ -58,11 +61,13 @@ class FieldPlotter:
         If True, auto plt.show() the plot.
 
     """
-    def __init__(self, files, field, only_mc=False, center_events=0):
+    def __init__(self, files, field, only_mc=False, center_events=0,
+                 add_t0=False):
         self.files = files
         self.field = field
         self.only_mc = only_mc
         self.center_events = center_events
+        self.add_t0 = add_t0
 
         self.data = None
         self.n_events = None
@@ -148,23 +153,23 @@ class FieldPlotter:
         else:
             files = self.files
 
-        for fname in files:
-            print("File " + fname)
-            event_pump = kp.io.hdf5.HDF5Pump(filename=fname)
+        event_pump = kp.io.hdf5.HDF5Pump(filenames=files)
 
-            for i, event_blob in enumerate(event_pump):
-                self.n_events += 1
+        for i, event_blob in enumerate(event_pump):
+            self.n_events += 1
 
-                if i % 2000 == 1:
-                    print("Blob no. "+str(i))
+            if i % 2000 == 0:
+                print("Blob no. "+str(i))
 
-                data_one_event = self._get_hits(event_blob)
+            data_one_event = self._get_hits(event_blob)
 
-                if data_all_events is None:
-                    data_all_events = data_one_event
-                else:
-                    data_all_events = np.concatenate(
-                        [data_all_events, data_one_event], axis=0)
+            if data_all_events is None:
+                data_all_events = data_one_event
+            else:
+                data_all_events = np.concatenate(
+                    [data_all_events, data_one_event], axis=0)
+
+        event_pump.finish()
 
         print("Number of events: " + str(self.n_events))
         return data_all_events
@@ -255,6 +260,7 @@ class FieldPlotter:
         event_blob
             The km3pipe event blob.
 
+
         Returns
         -------
         blob_data : ndarray
@@ -267,6 +273,13 @@ class FieldPlotter:
             field_name = "Hits"
 
         blob_data = event_blob[field_name][self.field]
+
+        if self.add_t0:
+            if self.field != "time":
+                raise ValueError('add_t0==True but field=="time": Can only add'
+                                 't0 calibration to time, not' + str(field_name))
+            t0 = event_blob[field_name]["t0"]
+            blob_data = np.add(blob_data, t0)
 
         if self.center_events == 1:
             triggered = event_blob[field_name].triggered
@@ -297,7 +310,7 @@ class TimePlotter(FieldPlotter):
     """
     For plotting the time.
     """
-    def __init__(self, files, only_mc=False):
+    def __init__(self, files, add_t0, only_mc=False):
         field = "time"
 
         if only_mc:
@@ -308,7 +321,8 @@ class TimePlotter(FieldPlotter):
         FieldPlotter.__init__(self, files,
                               field,
                               only_mc=only_mc,
-                              center_events=center_events)
+                              center_events=center_events,
+                              add_t0=add_t0)
 
 
 class ZPlotter(FieldPlotter):
