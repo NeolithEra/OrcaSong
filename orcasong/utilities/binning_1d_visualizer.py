@@ -1,6 +1,15 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+"""
+For investigating the ideal binning, based on the info in calibrated
+.h5 files.
+
+Specialized classes TimePlotter and ZPlotter are available for plotting
+the time/ Z-Coordinate.
+
+"""
+
 import numpy as np
 import km3pipe as kp
 import matplotlib.pyplot as plt
@@ -8,8 +17,8 @@ import matplotlib.pyplot as plt
 
 class FieldPlotter:
     """
-    For investigating the ideal binning, based on the info in calibrated
-    .h5 files.
+    Baseclass for investigating the ideal binning, based on the info in
+    calibrated .h5 files.
 
     Intended for 1d binning, like time or pos_z.
     Workflow:
