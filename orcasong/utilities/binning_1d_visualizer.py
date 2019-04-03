@@ -352,17 +352,19 @@ def time_extractor(event_blob, get_mc_hits=False):
     """
     blob_data_hits = event_blob["Hits"].time
 
-    t0 = event_blob["Hits"].t0
-    triggered = event_blob["Hits"].triggered
+    if "McHits" not in event_blob:
+        # add t0 only for real data, not sims
+        t0 = event_blob["Hits"].t0
+        blob_data_hits = np.add(blob_data_hits, t0)
 
-    blob_data_hits = np.add(blob_data_hits, t0)
-    first_trigger = np.min(blob_data_hits[triggered == 1])
+    triggered = event_blob["Hits"].triggered
+    t_first_trigger = np.min(blob_data_hits[triggered == 1])
 
     if get_mc_hits:
         blob_data_mc_hits = event_blob["McHits"].time
-        blob_data = np.subtract(blob_data_mc_hits, first_trigger)
+        blob_data = np.subtract(blob_data_mc_hits, t_first_trigger)
     else:
-        blob_data = np.subtract(blob_data_hits, first_trigger)
+        blob_data = np.subtract(blob_data_hits, t_first_trigger)
 
     return blob_data
 
