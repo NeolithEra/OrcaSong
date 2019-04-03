@@ -223,7 +223,7 @@ class FieldPlotter:
         if data is None:
             raise ValueError("Can not make histogram, no data extracted yet.")
 
-        bin_edges = self._get_bin_edges()
+        bin_edges = self._get_padded_bin_edges()
 
         fig, ax = plt.subplots()
         n, bins, patches = plt.hist(data, bins=bin_edges, **self.hist_kwargs)
@@ -253,7 +253,7 @@ class FieldPlotter:
 
         return fig
 
-    def _get_bin_edges(self):
+    def _get_padded_bin_edges(self):
         """
         Get the padded bin edges.
 
@@ -325,11 +325,12 @@ class FieldPlotter:
         return "<FieldPlotter: {}>".format(self.files)
 
 
-def time_extractor(event_blob, get_mc_hits, add_t0):
+def time_extractor(event_blob, get_mc_hits=False):
     """
     Get the hit times from an event blob, centered with first triggered hit.
 
-    McHits will be centered with first hit, not first triggered hit.
+    McHits will also be centered with first triggered hit of "Hits".
+    t0 will be added to the time for real data, but not simulations.
 
     Parameters
     ----------
@@ -337,8 +338,6 @@ def time_extractor(event_blob, get_mc_hits, add_t0):
         A blob from a km3pipe event pump.
     get_mc_hits : bool
         If true, will get the "McHits" instead of the "Hits".
-    add_t0 : bool
-        Add the t0 to the time. Should currently not be done for simulations.
 
     Returns
     -------
@@ -346,33 +345,19 @@ def time_extractor(event_blob, get_mc_hits, add_t0):
         The hit times.
 
     """
-    if get_mc_hits:
-        field_name = "McHits"
-    else:
-        field_name = "Hits"
+    blob_data_hits = event_blob["Hits"].time
+    blob_data_mc_hits = event_blob["McHits"].time
 
-    blob_data = event_blob[field_name]["time"]
+    t0 = event_blob["Hits"].t0
+    triggered = event_blob["Hits"].triggered
 
-    if add_t0:
-        t0 = event_blob[field_name]["t0"]
-        blob_data = np.add(blob_data, t0)
+    blob_data_hits = np.add(blob_data_hits, t0)
+    first_trigger = np.min(blob_data_hits[triggered == 1])
 
     if get_mc_hits:
-        # using first event to center
-        first_hit = np.min(blob_data)
-        blob_data = np.subtract(blob_data, first_hit)
-        # center with median
-        # median = np.median(blob_data)
-        # blob_data = np.subtract(blob_data, median)
-
+        blob_data = np.subtract(blob_data_mc_hits, first_trigger)
     else:
-        # using only first triggered event to center
-        triggered = event_blob[field_name].triggered
-        first_trigger = np.min(blob_data[triggered == 1])
-        blob_data = np.subtract(blob_data, first_trigger)
-        # center with median:
-        # median_trigger = np.median(blob_data[triggered == 1])
-        # blob_data = np.subtract(blob_data, median_trigger)
+        blob_data = np.subtract(blob_data_hits, first_trigger)
 
     return blob_data
 
@@ -386,8 +371,7 @@ class TimePlotter(FieldPlotter):
         FieldPlotter.__init__(self, files, field)
 
     def _get_hits(self, event_blob, get_mc_hits):
-        add_t0 = "McHits" not in event_blob
-        blob_data = time_extractor(event_blob, get_mc_hits, add_t0)
+        blob_data = time_extractor(event_blob, get_mc_hits)
         return blob_data
 
 
@@ -401,7 +385,7 @@ class ZPlotter(FieldPlotter):
 
         self.plotting_bins = 100
 
-    def _get_bin_edges(self):
+    def _get_padded_bin_edges(self):
         """
         Get the padded bin edges.
 
@@ -424,3 +408,6 @@ class ZPlotter(FieldPlotter):
                                 n_bins + 1)
         self.limits = bin_edges
         self.n_bins = n_bins
+
+    def get_bin_edges(self):
+        return self.limits
