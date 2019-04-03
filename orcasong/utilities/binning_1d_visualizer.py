@@ -346,7 +346,6 @@ def time_extractor(event_blob, get_mc_hits=False):
 
     """
     blob_data_hits = event_blob["Hits"].time
-    blob_data_mc_hits = event_blob["McHits"].time
 
     t0 = event_blob["Hits"].t0
     triggered = event_blob["Hits"].triggered
@@ -355,6 +354,7 @@ def time_extractor(event_blob, get_mc_hits=False):
     first_trigger = np.min(blob_data_hits[triggered == 1])
 
     if get_mc_hits:
+        blob_data_mc_hits = event_blob["McHits"].time
         blob_data = np.subtract(blob_data_mc_hits, first_trigger)
     else:
         blob_data = np.subtract(blob_data_hits, first_trigger)
