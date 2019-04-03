@@ -84,7 +84,9 @@ class FieldPlotter:
             "density": True,
         }
         self.xlim = None
+        self.ylim = None
         self.show_plots = True
+        self.last_ylim = None
 
     def plot(self, only_mc_hits=False, save_path=None):
         """
@@ -99,14 +101,14 @@ class FieldPlotter:
 
         Returns
         -------
-        fig : pyplot figure
+        fig, ax : pyplot figure
             The plot.
 
         """
         if self.hits is None:
             self.extract()
-        fig = self.make_histogram(only_mc_hits, save_path)
-        return fig
+        fig, ax = self.make_histogram(only_mc_hits, save_path)
+        return fig, ax
 
     def set_binning(self, limits, n_bins):
         """
@@ -211,7 +213,7 @@ class FieldPlotter:
 
         Returns
         -------
-        fig : pyplot figure
+        fig, ax : pyplot figure
             The plot.
 
         """
@@ -241,6 +243,9 @@ class FieldPlotter:
         if self.xlim is not None:
             plt.xlim(self.xlim)
 
+        if self.ylim is not None:
+            plt.ylim(self.ylim)
+
         plt.ylabel(self.ylabel)
         plt.tight_layout()
 
@@ -251,7 +256,7 @@ class FieldPlotter:
         if self.show_plots:
             plt.show()
 
-        return fig
+        return fig, ax
 
     def _get_padded_bin_edges(self):
         """
