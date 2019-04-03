@@ -18,9 +18,9 @@ import matplotlib.pyplot as plt
 class FieldPlotter:
     """
     Baseclass for investigating the ideal binning, based on the info in
-    calibrated .h5 files.
+    a field of calibrated .h5 files.
 
-    Intended for 1d binning, like time or pos_z.
+    Intended for 1d binning, like for fields "time" or "pos_z".
     Workflow:
     1. Initialize with files, then run .plot() to extract and store
        the data, and show the plot interactively.
@@ -28,7 +28,7 @@ class FieldPlotter:
     3. Run .plot() again to show the plot with the adjusted binning on the
        stored data.
     4. Repeat step 2 and 3 unitl happy with binning.
-    (5.) Save plot via .plot(savepath)
+    (5.) Save plot via .plot(savepath), or get the bin edges via .get_bin_edges()
 
     The plot will have some bins attached in both directions for
     better overview.
@@ -39,18 +39,10 @@ class FieldPlotter:
         The .h5 file(s).
     field : str
         The field to look stuff up, e.g. "time", "pos_z", ...
-    only_mc : bool
-        If true, will look up "McHits" in the blob. Otherwise "Hits".
-    center_events : int
-        For centering events with their median.
-        0 : No centering.
-        1 : Center with median of triggered hits.
-        2 : Center with median of all hits.
-    add_t0 : bool
-        If True, add the t0 calibration to the time. Only makes sense
-        for field=="time" obviously.
-    data : ndarray
-        The extracted data.
+    hits : ndarray
+        The extracted Hits.
+    mc_hits : ndarray
+        The extracted McHits, if present.
     n_events : int
         The number of events in the extracted data.
     limits : List
@@ -59,9 +51,11 @@ class FieldPlotter:
         The number of bins.
     plot_padding : List
         Fraction of bins to append to left and right direction
-        (only in the plot).
+        (only in the plot for better overview).
     x_label : str
+        X label of the plot.
     y_label : str
+        Y label of the plot.
     hist_kwargs : dict
         Kwargs for plt.hist
     xlim : List
@@ -70,15 +64,12 @@ class FieldPlotter:
         If True, auto plt.show() the plot.
 
     """
-    def __init__(self, files, field, only_mc=False, center_events=0,
-                 add_t0=False):
+    def __init__(self, files, field):
         self.files = files
         self.field = field
-        self.only_mc = only_mc
-        self.center_events = center_events
-        self.add_t0 = add_t0
 
-        self.data = None
+        self.hits = None
+        self.mc_hits = None
         self.n_events = None
 
         self.limits = None
@@ -95,12 +86,14 @@ class FieldPlotter:
         self.xlim = None
         self.show_plots = True
 
-    def plot(self, save_path=None):
+    def plot(self, only_mc_hits=False, save_path=None):
         """
         Generate and store or load the data, then make the plot.
 
         Parameters
         ----------
+        only_mc_hits : bool
+            If true, plot the McHits instead of the Hits.
         save_path : str, optional
             Save plot to here.
 
@@ -110,9 +103,9 @@ class FieldPlotter:
             The plot.
 
         """
-        if self.data is None:
-            self.data = self.get_events_data()
-        fig = self.make_histogram(save_path)
+        if self.hits is None:
+            self.extract()
+        fig = self.make_histogram(only_mc_hits, save_path)
         return fig
 
     def set_binning(self, limits, n_bins):
@@ -132,7 +125,7 @@ class FieldPlotter:
 
     def get_binning(self):
         """
-        Get the stored binning.
+        Set the desired binning.
 
         Returns
         -------
@@ -144,17 +137,28 @@ class FieldPlotter:
         """
         return self.limits, self.n_bins
 
-    def get_events_data(self):
+    def get_bin_edges(self):
         """
-        Get the content of a field from all events in the file(s).
+        Get the bin edges as a ndarray.
 
-        Returns:
-        --------
-        data : ndarray
-            The desired data.
+        """
+        limits, n_bins = self.get_binning()
+
+        if limits is None:
+            raise ValueError("Can not return bin edges: No binning limits set")
+
+        bin_edges = np.linspace(limits[0], limits[1], n_bins + 1)
+
+        return bin_edges
+
+    def extract(self):
+        """
+        Extract the content of a field from all events in the file(s) and
+        store it.
 
         """
         data_all_events = None
+        mc_all_events = None
         self.n_events = 0
 
         if not isinstance(self.files, list):
@@ -170,7 +174,7 @@ class FieldPlotter:
             if i % 2000 == 0:
                 print("Blob no. "+str(i))
 
-            data_one_event = self._get_hits(event_blob)
+            data_one_event = self._get_hits(event_blob, get_mc_hits=False)
 
             if data_all_events is None:
                 data_all_events = data_one_event
@@ -178,17 +182,30 @@ class FieldPlotter:
                 data_all_events = np.concatenate(
                     [data_all_events, data_one_event], axis=0)
 
+            if "McHits" in event_blob:
+                mc_one_event = self._get_hits(event_blob, get_mc_hits=True)
+
+                if mc_all_events is None:
+                    mc_all_events = mc_one_event
+                else:
+                    mc_all_events = np.concatenate(
+                        [mc_all_events, mc_one_event], axis=0)
+
         event_pump.finish()
 
         print("Number of events: " + str(self.n_events))
-        return data_all_events
 
-    def make_histogram(self, save_path=None):
+        self.hits = data_all_events
+        self.mc_hits = mc_all_events
+
+    def make_histogram(self, only_mc_hits=False, save_path=None):
         """
         Plot the hist data. Can also save it if given a save path.
 
         Parameters
         ----------
+        only_mc_hits : bool
+            If true, plot the McHits instead of the Hits.
         save_path : str, optional
             Save the fig to this path.
 
@@ -198,13 +215,18 @@ class FieldPlotter:
             The plot.
 
         """
-        if self.data is None:
+        if only_mc_hits:
+            data = self.mc_hits
+        else:
+            data = self.hits
+
+        if data is None:
             raise ValueError("Can not make histogram, no data extracted yet.")
 
         bin_edges = self._get_bin_edges()
 
         fig, ax = plt.subplots()
-        n, bins, patches = plt.hist(self.data, bins=bin_edges, **self.hist_kwargs)
+        n, bins, patches = plt.hist(data, bins=bin_edges, **self.hist_kwargs)
         print("Size of first bin: " + str(bins[1] - bins[0]))
 
         plt.grid(True, zorder=0, linestyle='dotted')
@@ -260,44 +282,29 @@ class FieldPlotter:
 
         return bin_edges
 
-    def _get_hits(self, event_blob):
+    def _get_hits(self, event_blob, get_mc_hits):
         """
-        Get desired attribute from a event blob.
+        Get desired attribute from an event blob.
 
         Parameters
         ----------
         event_blob
-            The km3pipe event blob.
-
+            The blob.
+        get_mc_hits : bool
+            If true, will get the "McHits" instead of the "Hits".
 
         Returns
         -------
         blob_data : ndarray
-            The desired data.
+            The data.
 
         """
-        if self.only_mc:
+        if get_mc_hits:
             field_name = "McHits"
         else:
             field_name = "Hits"
 
         blob_data = event_blob[field_name][self.field]
-
-        if self.add_t0:
-            if self.field != "time":
-                raise ValueError('add_t0==True but field=="time": Can only add'
-                                 't0 calibration to time, not' + str(field_name))
-            t0 = event_blob[field_name]["t0"]
-            blob_data = np.add(blob_data, t0)
-
-        if self.center_events == 1:
-            triggered = event_blob[field_name].triggered
-            median_trigger = np.median(blob_data[triggered == 1])
-            blob_data = np.subtract(blob_data, median_trigger)
-
-        elif self.center_events == 2:
-            median = np.median(blob_data)
-            blob_data = np.subtract(blob_data, median)
 
         return blob_data
 
@@ -314,37 +321,83 @@ class FieldPlotter:
             xlabel = None
         return xlabel
 
+    def __repr__(self):
+        return "<FieldPlotter: {}>".format(self.files)
+
+
+def time_extractor(event_blob, get_mc_hits, add_t0):
+    """
+    Get the hit times from an event blob, centered with first triggered hit.
+
+    McHits will be centered with first hit, not first triggered hit.
+
+    Parameters
+    ----------
+    event_blob
+        A blob from a km3pipe event pump.
+    get_mc_hits : bool
+        If true, will get the "McHits" instead of the "Hits".
+    add_t0 : bool
+        Add the t0 to the time. Should currently not be done for simulations.
+
+    Returns
+    -------
+    blob_data : ndarray
+        The hit times.
+
+    """
+    if get_mc_hits:
+        field_name = "McHits"
+    else:
+        field_name = "Hits"
+
+    blob_data = event_blob[field_name]["time"]
+
+    if add_t0:
+        t0 = event_blob[field_name]["t0"]
+        blob_data = np.add(blob_data, t0)
+
+    if get_mc_hits:
+        # using first event to center
+        first_hit = np.min(blob_data)
+        blob_data = np.subtract(blob_data, first_hit)
+        # center with median
+        # median = np.median(blob_data)
+        # blob_data = np.subtract(blob_data, median)
+
+    else:
+        # using only first triggered event to center
+        triggered = event_blob[field_name].triggered
+        first_trigger = np.min(blob_data[triggered == 1])
+        blob_data = np.subtract(blob_data, first_trigger)
+        # center with median:
+        # median_trigger = np.median(blob_data[triggered == 1])
+        # blob_data = np.subtract(blob_data, median_trigger)
+
+    return blob_data
+
 
 class TimePlotter(FieldPlotter):
     """
     For plotting the time.
     """
-    def __init__(self, files, add_t0, only_mc=False):
+    def __init__(self, files):
         field = "time"
+        FieldPlotter.__init__(self, files, field)
 
-        if only_mc:
-            center_events = 2
-        else:
-            center_events = 1
-
-        FieldPlotter.__init__(self, files,
-                              field,
-                              only_mc=only_mc,
-                              center_events=center_events,
-                              add_t0=add_t0)
+    def _get_hits(self, event_blob, get_mc_hits):
+        add_t0 = "McHits" not in event_blob
+        blob_data = time_extractor(event_blob, get_mc_hits, add_t0)
+        return blob_data
 
 
 class ZPlotter(FieldPlotter):
     """
     For plotting the z dim.
     """
-    def __init__(self, files, only_mc=False):
+    def __init__(self, files):
         field = "pos_z"
-        center_events = 0
-        FieldPlotter.__init__(self, files,
-                              field,
-                              only_mc=only_mc,
-                              center_events=center_events)
+        FieldPlotter.__init__(self, files, field)
 
         self.plotting_bins = 100
 
