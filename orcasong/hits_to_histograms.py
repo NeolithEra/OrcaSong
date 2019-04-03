@@ -78,6 +78,73 @@ def get_time_parameters(event_hits, mode=('trigger_cluster', 'all'), t_start_mar
     return t_start, t_end
 
 
+def compute_histograms(event_hits, bin_edges_dict):
+    """
+    Do the binning.
+
+    Parameters
+    ----------
+    event_hits
+        "Hits" from the blob.
+    bin_edges_dict : dict
+        Keys: str
+            The field names of what to bin. If a field name appears here,
+            it means it will be in the output.
+        Values: ndarray or None
+            The bin edges, including the left most and right most bin edge.
+
+    Returns
+    -------
+    kp_hist
+
+    """
+    data, bins, name = get_ordered_data(event_hits, bin_edges_dict)
+    histogram = np.histogramdd(data, bins=bins)
+
+    title = name + "_event_images"
+    kp_hist = kp.dataclasses.NDArray(
+        histogram[0][np.newaxis, ...].astype(np.uint8), h5loc='x',
+        title=title)
+
+    return kp_hist
+
+
+def get_ordered_data(event_hits, bin_edges_dict):
+    """
+    Get the fieldnames from the bin_edges_dict in the given order.
+
+    Parameters
+    ----------
+    event_hits
+    bin_edges_dict : dict
+
+    Returns
+    -------
+    ordered_data : List
+        ndarrays of data, in the correct order.
+
+    """
+    # order of appearance, binning can only be done for these
+    order = ("pos_x", "pos_y", "pos_z", "time", "channel_id")
+    alias = ("x", "y", "z", "t", "c")
+
+    for field_name in bin_edges_dict.keys():
+        if field_name not in order:
+            raise NameError("Unknown field name in event: {}".format(field_name))
+
+    ordered_data = []
+    ordered_bins = []
+    name = ""
+
+    for i, order_name in enumerate(order):
+        if order_name in bin_edges_dict:
+            ordered_data.append(event_hits[order_name])
+            ordered_bins.append(bin_edges_dict[order_name])
+            name += alias[i]
+
+    return ordered_data, ordered_bins, name
+
+
 def compute_4d_to_2d_histograms(event_hits, event_track, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, timecut, do2d_plots, pdf_2d_plots):
     """
     Computes 2D numpy histogram 'images' from the 4D data and appends the 2D histograms to the all_4d_to_2d_hists list,
@@ -291,6 +358,42 @@ def compute_4d_to_4d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
     hist_4d = kp.dataclasses.NDArray(hist_4d[0][np.newaxis, ...].astype(np.uint8), h5loc='x', title=title)
 
     return hist_4d
+
+
+class MyHistMaker(kp.Module):
+    """
+    Class that takes a km3pipe blob which contains the information for one event and returns
+    a blob with a hit array and a track array that contains all relevant information of the event.
+    """
+    def configure(self):
+        """
+        Sets up the input arguments of the EventDataExtractor class.
+        """
+        self.bin_edges_dict = self.require('bin_edges_dict')
+
+    def process(self, blob):
+        """
+        Returns a blob (dict), which contains the event_hits array and the event_track array.
+
+        Parameters
+        ----------
+        blob : dict
+            Km3pipe blob which contains all the data from the input file.
+
+        Returns
+        -------
+        blob
+
+        """
+        data, bins, name = get_ordered_data(blob["event_hits"], self.bin_edges_dict)
+        histogram = np.histogramdd(data, bins=bins)
+
+        title = name + "_event_images"
+        kp_hist = kp.dataclasses.NDArray(
+            histogram[0][np.newaxis, ...].astype(np.uint8), h5loc='x',
+            title=title)
+        blob[name] = kp_hist
+        return blob
 
 
 class HistogramMaker(kp.Module):

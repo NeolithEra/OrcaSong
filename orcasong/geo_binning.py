@@ -30,7 +30,8 @@ def calculate_bin_edges(n_bins, det_geo, detx_filepath, do4d):
 
     Returns
     -------
-    x_bin_edges, y_bin_edges, z_bin_edges : ndarray(ndim=1)
+    bin_edges_dict : dict
+        Contains the x_bin_edges, y_bin_edges, z_bin_edges : ndarray(ndim=1)
         The bin edges for the x,y,z direction.
 
     """
@@ -71,7 +72,13 @@ def calculate_bin_edges(n_bins, det_geo, detx_filepath, do4d):
     else:
         raise ValueError('The specified detector geometry "' + str(det_geo) + '" is not available.')
 
-    return geo, x_bin_edges, y_bin_edges, z_bin_edges
+    bin_edges_dict = {
+        "pos_x": x_bin_edges,
+        "pos_y": y_bin_edges,
+        "pos_z": z_bin_edges,
+    }
+
+    return bin_edges_dict
 
 
 def calculate_bin_edges_test(geo, y_bin_edges, z_bin_edges):

@@ -122,7 +122,7 @@ def make_nn_images(fname, detx_filepath, config):
     print('Setting a Global Random State with the seed < 42 >.')
     km.GlobalRandomState(seed=42)
 
-    geo, x_bin_edges, y_bin_edges, z_bin_edges = calculate_bin_edges(n_bins, det_geo, detx_filepath, do4d)
+    bin_edges_dict = calculate_bin_edges(n_bins, det_geo, detx_filepath, do4d)
     pdf_2d_plots = PdfPages(output_dirpath + '/orcasong_output/4dTo2d/' + filename_output + '_plots.pdf') if do2d_plots[0] is True else None
 
     file_particle_type = get_file_particle_type(fname)
@@ -130,21 +130,22 @@ def make_nn_images(fname, detx_filepath, config):
     print('Generating histograms from the hits for files based on ' + fname)
 
     # Initialize OrcaSong Event Pipeline
-
-    pipe = kp.Pipeline() # add timeit=True argument for profiling
+    geo = kp.calib.Calibration(filename=detx_filepath)
+    pipe = kp.Pipeline()  # add timeit=True argument for profiling
     pipe.attach(km.common.StatusBar, every=200)
     pipe.attach(km.common.MemoryObserver, every=400)
     pipe.attach(kp.io.hdf5.HDF5Pump, filename=fname)
     pipe.attach(km.common.Keep, keys=['EventInfo', 'Header', 'RawHeader', 'McTracks', 'Hits', 'McHits'])
+
     pipe.attach(EventDataExtractor,
                 file_particle_type=file_particle_type, geo=geo, do_mc_hits=do_mc_hits,
                 data_cuts=data_cuts, do4d=do4d, prod_ident=prod_ident)
     pipe.attach(km.common.Keep, keys=['event_hits', 'event_track'])
     pipe.attach(EventSkipper, data_cuts=data_cuts)
-    pipe.attach(HistogramMaker,
-                x_bin_edges=x_bin_edges, y_bin_edges=y_bin_edges, z_bin_edges=z_bin_edges,
+    pipe.attach(HistogramMaker, bin_edges_dict,
                 n_bins=n_bins, timecut=timecut, do2d=do2d, do2d_plots=do2d_plots, pdf_2d_plots=pdf_2d_plots,
                 do3d=do3d, do4d=do4d)
+
     pipe.attach(km.common.Delete, keys=['event_hits'])
 
     if do2d:
@@ -152,7 +153,6 @@ def make_nn_images(fname, detx_filepath, config):
             savestr = output_dirpath + '/orcasong_output/4dTo2d/' + proj + '/' + filename_output + '_' + proj + '.h5'
             pipe.attach(kp.io.HDF5Sink, filename=savestr, blob_keys=[proj, 'event_track'], complib=complib,
                         complevel=complevel, chunksize=chunksize, flush_frequency=flush_freq)
-
 
     if do3d:
         for proj in ['xyz', 'xyt', 'xzt', 'yzt', 'rzt']:
