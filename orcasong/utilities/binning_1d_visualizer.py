@@ -290,13 +290,13 @@ class FieldPlotter:
 
         return bin_edges
 
-    def _get_hits(self, event_blob, get_mc_hits):
+    def _get_hits(self, blob, get_mc_hits):
         """
         Get desired attribute from an event blob.
 
         Parameters
         ----------
-        event_blob
+        blob
             The blob.
         get_mc_hits : bool
             If true, will get the "McHits" instead of the "Hits".
@@ -312,10 +312,10 @@ class FieldPlotter:
         else:
             field_name = "Hits"
 
-        blob_data = event_blob[field_name][self.field]
+        blob_data = blob[field_name][self.field]
 
         if self.filter_for_du is not None:
-            dus = event_blob[field_name]["du"]
+            dus = blob[field_name]["du"]
             blob_data = blob_data[dus == self.filter_for_du]
 
         return blob_data
@@ -337,43 +337,49 @@ class FieldPlotter:
         return "<FieldPlotter: {}>".format(self.files)
 
 
-def time_extractor(event_blob, get_mc_hits=False):
+class TimePreproc(kp.Module):
     """
-    Get the hit times from an event blob, centered with first triggered hit.
+    Preprocess the time in the blob.
 
-    McHits will also be centered with first triggered hit of "Hits".
     t0 will be added to the time for real data, but not simulations.
-
-    Parameters
-    ----------
-    event_blob
-        A blob from a km3pipe event pump.
-    get_mc_hits : bool
-        If true, will get the "McHits" instead of the "Hits".
-
-    Returns
-    -------
-    blob_data : ndarray
-        The hit times.
+    Time hits and mchits will be shifted by the time of the first triggered hit.
 
     """
-    blob_data_hits = event_blob["Hits"].time
+    def configure(self):
+        self.correct_hits = self.get('correct_hits', default=True)
+        self.correct_mchits = self.get('correct_mchits', default=True)
 
-    if "McHits" not in event_blob:
+    def process(self, blob):
+        blob = time_preproc(blob, self.correct_hits, self.correct_mchits)
+        return blob
+
+
+def time_preproc(blob, correct_hits=True, correct_mchits=True):
+    """
+    Preprocess the time in the blob.
+
+    t0 will be added to the time for real data, but not simulations.
+    Time hits and mchits will be shifted by the time of the first triggered hit.
+
+    """
+    hits_time = blob["Hits"].time
+
+    if "McHits" not in blob:
         # add t0 only for real data, not sims
-        t0 = event_blob["Hits"].t0
-        blob_data_hits = np.add(blob_data_hits, t0)
+        hits_t0 = blob["Hits"].t0
+        hits_time = np.add(hits_time, hits_t0)
 
-    triggered = event_blob["Hits"].triggered
-    t_first_trigger = np.min(blob_data_hits[triggered == 1])
+    hits_triggered = blob["Hits"].triggered
+    t_first_trigger = np.min(hits_time[hits_triggered == 1])
 
-    if get_mc_hits:
-        blob_data_mc_hits = event_blob["McHits"].time
-        blob_data = np.subtract(blob_data_mc_hits, t_first_trigger)
-    else:
-        blob_data = np.subtract(blob_data_hits, t_first_trigger)
+    if correct_hits:
+        blob["Hits"].time = np.subtract(hits_time, t_first_trigger)
 
-    return blob_data
+    if correct_mchits:
+        mchits_time = blob["McHits"].time
+        blob["McHits"].time = np.subtract(mchits_time, t_first_trigger)
+
+    return blob
 
 
 class TimePlotter(FieldPlotter):
@@ -384,16 +390,18 @@ class TimePlotter(FieldPlotter):
         field = "time"
         FieldPlotter.__init__(self, files, field)
 
-    def _get_hits(self, event_blob, get_mc_hits):
-        blob_data = time_extractor(event_blob, get_mc_hits)
+    def _get_hits(self, blob, get_mc_hits):
+        blob = time_preproc(blob)
+
+        if get_mc_hits:
+            field_name = "McHits"
+        else:
+            field_name = "Hits"
+
+        blob_data = blob[field_name][self.field]
 
         if self.filter_for_du is not None:
-            if get_mc_hits:
-                field_name = "McHits"
-            else:
-                field_name = "Hits"
-
-            dus = event_blob[field_name]["du"]
+            dus = blob[field_name]["du"]
             blob_data = blob_data[dus == self.filter_for_du]
 
         return blob_data
