@@ -39,6 +39,8 @@ class FieldPlotter:
         The .h5 file(s).
     field : str
         The field to look stuff up, e.g. "time", "pos_z", ...
+    filter_for_du : int, optional
+        Only get hits from one specific du, specified by the int.
     hits : ndarray
         The extracted Hits.
     mc_hits : ndarray
@@ -67,6 +69,7 @@ class FieldPlotter:
     def __init__(self, files, field):
         self.files = files
         self.field = field
+        self.filter_for_du = None
 
         self.hits = None
         self.mc_hits = None
@@ -193,7 +196,7 @@ class FieldPlotter:
                     mc_all_events = np.concatenate(
                         [mc_all_events, mc_one_event], axis=0)
 
-        event_pump.finish()
+        event_pump.close()
 
         print("Number of events: " + str(self.n_events))
 
@@ -311,6 +314,10 @@ class FieldPlotter:
 
         blob_data = event_blob[field_name][self.field]
 
+        if self.filter_for_du is not None:
+            dus = event_blob[field_name]["du"]
+            blob_data = blob_data[dus == self.filter_for_du]
+
         return blob_data
 
     def _get_xlabel(self):
@@ -379,6 +386,16 @@ class TimePlotter(FieldPlotter):
 
     def _get_hits(self, event_blob, get_mc_hits):
         blob_data = time_extractor(event_blob, get_mc_hits)
+
+        if self.filter_for_du is not None:
+            if get_mc_hits:
+                field_name = "McHits"
+            else:
+                field_name = "Hits"
+
+            dus = event_blob[field_name]["du"]
+            blob_data = blob_data[dus == self.filter_for_du]
+
         return blob_data
 
 
