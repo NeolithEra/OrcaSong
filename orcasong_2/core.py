@@ -2,7 +2,8 @@ import os
 import km3pipe as kp
 import km3modules as km
 
-from orcasong_2.modules import (TimePreproc,
+from orcasong_2.modules import (DetApplier,
+                                TimePreproc,
                                 ImageMaker,
                                 McInfoMaker,
                                 BinningStatsMaker,
@@ -25,21 +26,6 @@ class FileBinner:
 
     Attributes
     ----------
-    bin_edges_list : List
-        List with the names of the fields to bin, and the respective bin edges,
-        including the left- and right-most bin edge.
-        Example: For 10 bins in the z direction, and 100 bins in time:
-            bin_edges_list = [
-                ["pos_z", np.linspace(0, 10, 11)],
-                ["time", np.linspace(-50, 550, 101)],
-            ]
-    mc_info_extr : function or string, optional
-        Function that extracts desired mc_info from a blob, which is then
-        stored as the "y" datafield in the .h5 file.
-        Can also give a str identifier for an existing extractor.
-    event_skipper : func, optional
-        Function that takes the blob as an input, and returns a bool.
-        If the bool is true, the blob will be skipped.
     bin_plot_freq : int or None
         If int is given, defines after how many blobs data for an overview
         histogram is extracted.
@@ -74,11 +60,41 @@ class FileBinner:
         but it increases the RAM usage as well.
 
     """
-    def __init__(self, bin_edges_list, mc_info_extr=None,
-                 event_skipper=None, add_bin_stats=True):
+    def __init__(self,
+                 bin_edges_list,
+                 mc_info_extr=None,
+                 det_file=None,
+                 event_skipper=None,
+                 add_bin_stats=True):
+        """
+        Parameters
+        ----------
+        bin_edges_list : List
+            List with the names of the fields to bin, and the respective bin edges,
+            including the left- and right-most bin edge.
+            Example: For 10 bins in the z direction, and 100 bins in time:
+                bin_edges_list = [
+                    ["pos_z", np.linspace(0, 10, 11)],
+                    ["time", np.linspace(-50, 550, 101)],
+                ]
+        mc_info_extr : function or string, optional
+            Function that extracts desired mc_info from a blob, which is then
+            stored as the "y" datafield in the .h5 file.
+            Can also give a str identifier for an existing extractor.
+        det_file : str, optional
+            Path to a .detx detector geometry file, which can be used to
+            calibrate the hits.
+        event_skipper : func, optional
+            Function that takes the blob as an input, and returns a bool.
+            If the bool is true, the blob will be skipped.
+        add_bin_stats : bool
+            Add statistics of the binning to the output file. They can be
+            plotted with util/bin_stats_plot.py.
 
+        """
         self.bin_edges_list = bin_edges_list
         self.mc_info_extr = mc_info_extr
+        self.det_file = det_file
         self.event_skipper = event_skipper
 
         if add_bin_stats:
@@ -163,7 +179,7 @@ class FileBinner:
 
     def build_pipe(self, infile, outfile):
         """
-        Build the pipe to generate images and mc_info for a file.
+        Build the pipeline to generate images and mc_info for a file.
         """
 
         pipe = kp.Pipeline()
@@ -177,6 +193,10 @@ class FileBinner:
 
         pipe.attach(km.common.Keep, keys=['EventInfo', 'Header', 'RawHeader',
                                           'McTracks', 'Hits', 'McHits'])
+
+        if self.det_file:
+            pipe.attach(DetApplier, det_file=self.det_file)
+
         if self.do_time_preproc:
             pipe.attach(TimePreproc)
 

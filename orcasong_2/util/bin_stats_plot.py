@@ -1,4 +1,5 @@
 """
+Run with a parser to plot the binning statistics.
 Functions for plotting the bin stats made by the BinningStatsMaker module.
 """
 

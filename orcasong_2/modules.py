@@ -2,8 +2,9 @@
 Custom km3pipe modules for making nn input files.
 """
 
-import km3pipe as kp
+import warnings
 import numpy as np
+import km3pipe as kp
 
 __author__ = 'Stefan Reck'
 
@@ -238,3 +239,34 @@ class EventSkipper(kp.Module):
             return
         else:
             return blob
+
+
+class DetApplier(kp.Module):
+    """
+    Apply calibration to the Hits with a detx file.
+
+    Attributes
+    ----------
+    det_file : str
+        Path to a .detx detector geometry file.
+
+    """
+    def configure(self):
+        self.det_file = self.require("det_file")
+
+    def process(self, blob):
+        if self._is_calibrated(blob):
+            warnings.warn("Warning: File has already been calibrated. "
+                          "Skipping calibration...")
+        else:
+            geo = kp.calib.Calibration(filename=self.det_file)
+            hits = geo.apply(blob['Hits'])
+            blob['Hits'] = hits
+        return blob
+
+    def _is_calibrated(self, blob):
+        """ True if calibration has been applied already. """
+        is_calibrated = False
+        if 'pos_x' in blob['Hits'] or "pos_y" in blob["Hits"]:
+            is_calibrated = True
+        return is_calibrated
