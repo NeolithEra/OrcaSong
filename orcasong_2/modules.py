@@ -253,16 +253,23 @@ class DetApplier(kp.Module):
     """
     def configure(self):
         self.det_file = self.require("det_file")
+        self._geo = None
 
     def process(self, blob):
         if self._is_calibrated(blob):
             warnings.warn("Warning: File has already been calibrated. "
                           "Skipping calibration...")
         else:
-            geo = kp.calib.Calibration(filename=self.det_file)
+            geo = self._load_geo()
             hits = geo.apply(blob['Hits'])
             blob['Hits'] = hits
         return blob
+
+    def _load_geo(self):
+        """ Load the detector geometry, and store it."""
+        if self._geo is None:
+            self._geo = kp.calib.Calibration(filename=self.det_file)
+        return self._geo
 
     def _is_calibrated(self, blob):
         """ True if calibration has been applied already. """

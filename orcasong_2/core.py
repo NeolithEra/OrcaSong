@@ -125,8 +125,8 @@ class FileBinner:
         outfile : str
             Path to the output file (will be created).
         save_plot : bool
-            Save the binning hists as a pdf. Only possible if bin_plot_freq
-            is not None.
+            Save the binning hists as a pdf. Only possible if add_bin_stats
+            is True.
 
         """
         if save_plot and self.bin_plot_freq is None:
@@ -158,8 +158,8 @@ class FileBinner:
             The output folder to place them in. The output file name will
             be generated automatically.
         save_plot : bool
-            Save the binning hists as a pdf. Only possible if bin_plot_freq
-            is not None.
+            Save the binning hists as a pdf. Only possible if add_bin_stats
+            is True.
 
         """
         if save_plot and self.bin_plot_freq is None:
@@ -169,7 +169,7 @@ class FileBinner:
         for infile in infiles:
             outfile_name = os.path.splitext(os.path.basename(infile))[0] \
                            + "_hist.h5"
-            outfile = outfolder + outfile_name
+            outfile = os.path.join(outfolder, outfile_name)
             outfiles.append(outfile)
 
             self.run(infile, outfile, save_plot=False)
