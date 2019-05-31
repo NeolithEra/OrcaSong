@@ -114,7 +114,7 @@ class FileBinner:
         self.complevel = 1
         self.flush_frequency = 1000
 
-    def run(self, infile, outfile, save_plot=False):
+    def run(self, infile, outfile=None, save_plot=False):
         """
         Make images for a file.
 
@@ -122,8 +122,9 @@ class FileBinner:
         ----------
         infile : str
             Path to the input file.
-        outfile : str
-            Path to the output file (will be created).
+        outfile : str, optional
+            Path to the output file (will be created). If none is given,
+            will auto generate the name and save it in the cwd.
         save_plot : bool
             Save the binning hists as a pdf. Only possible if add_bin_stats
             is True.
@@ -134,6 +135,11 @@ class FileBinner:
 
         name, shape = self.get_names_and_shape()
         print("Generating {} images with shape {}".format(name, shape))
+
+        if outfile is None:
+            infile_basename = os.path.basename(infile)
+            outfile_name = os.path.splitext(infile_basename)[0] + "_binned.h5"
+            outfile = os.path.join(os.getcwd(), outfile_name)
 
         pipe = self.build_pipe(infile, outfile)
         smry = pipe.drain()
