@@ -26,6 +26,9 @@ def get_mc_info_extr(mc_info_extr):
     elif mc_info_extr == "event_and_run_id":
         mc_info_extr = get_event_and_run_id
 
+    elif mc_info_extr == "random_noise":
+        mc_info_extr = get_rn_mc
+
     else:
         raise NameError("Unknown mc_info_type " + mc_info_extr)
 
@@ -42,6 +45,20 @@ def get_event_and_run_id(blob):
 
     track = {'event_id': event_id,
              'run_id': run_id, }
+    return track
+
+
+def get_rn_mc(blob):
+    """
+    For random noise, which has particle_type 0.
+    """
+    event_id = blob['EventInfo'].event_id[0]
+    run_id = blob["EventInfo"].run_id
+    particle_type = 0
+
+    track = {'event_id': event_id,
+             'run_id': run_id,
+             'particle_type': particle_type}
     return track
 
 
