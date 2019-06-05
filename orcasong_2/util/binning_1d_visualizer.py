@@ -350,7 +350,7 @@ class TimePlotter(FieldPlotter):
         FieldPlotter.__init__(self, files, field)
 
     def _get_hits(self, blob, get_mc_hits):
-        blob = time_preproc(blob)
+        blob = time_preproc(blob, correct_mchits=get_mc_hits)
 
         if get_mc_hits:
             field_name = "McHits"
