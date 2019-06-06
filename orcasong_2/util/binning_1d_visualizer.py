@@ -14,7 +14,7 @@ import numpy as np
 import km3pipe as kp
 import matplotlib.pyplot as plt
 
-from orcasong_2.modules import time_preproc
+from orcasong_2.modules import TimePreproc
 
 __author__ = 'Stefan Reck'
 
@@ -345,12 +345,14 @@ class TimePlotter(FieldPlotter):
     """
     For plotting the time.
     """
-    def __init__(self, files):
+    def __init__(self, files, add_t0=True):
         field = "time"
         FieldPlotter.__init__(self, files, field)
+        self.tp = TimePreproc()
+        self.tp.add_t0 = add_t0
 
     def _get_hits(self, blob, get_mc_hits):
-        blob = time_preproc(blob, correct_mchits=get_mc_hits)
+        blob = self.tp.process(blob)
 
         if get_mc_hits:
             field_name = "McHits"

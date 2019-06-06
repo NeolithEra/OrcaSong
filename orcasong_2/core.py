@@ -64,6 +64,7 @@ class FileBinner:
                  bin_edges_list,
                  mc_info_extr=None,
                  det_file=None,
+                 add_t0=False,
                  event_skipper=None,
                  add_bin_stats=True):
         """
@@ -84,6 +85,9 @@ class FileBinner:
         det_file : str, optional
             Path to a .detx detector geometry file, which can be used to
             calibrate the hits.
+        add_t0 : bool
+            If true, add t0 to the time of hits. If using a det_file,
+            this will already have been done automatically.
         event_skipper : func, optional
             Function that takes the blob as an input, and returns a bool.
             If the bool is true, the blob will be skipped.
@@ -95,6 +99,7 @@ class FileBinner:
         self.bin_edges_list = bin_edges_list
         self.mc_info_extr = mc_info_extr
         self.det_file = det_file
+        self.add_t0 = add_t0
         self.event_skipper = event_skipper
 
         if add_bin_stats:
@@ -204,7 +209,7 @@ class FileBinner:
             pipe.attach(DetApplier, det_file=self.det_file)
 
         if self.do_time_preproc:
-            pipe.attach(TimePreproc)
+            pipe.attach(TimePreproc, add_t0=self.add_t0)
 
         if self.event_skipper is not None:
             pipe.attach(EventSkipper, event_skipper=self.event_skipper)

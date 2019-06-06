@@ -42,46 +42,64 @@ class TimePreproc(kp.Module):
     """
     Preprocess the time in the blob.
 
-    t0 will be added to the time for real data, but not simulations.
-    Time hits and mchits will be shifted by the time of the first
+    t0 can be added.
+    Time hits and mchits will be centered with the time of the first
     triggered hit.
 
+    Attributes
+    ----------
+    add_t0 : bool
+        If true, t0 will be added.
+
     """
+    def configure(self):
+        self.add_t0 = self.require('add_t0')
+        self.center_hits = True
+        self.center_mchits = None
+
+        self._t0_done = False
+        self._cent_hits_done = False
+        self._cent_mchits_done = False
+
     def process(self, blob):
-        correct_mchits = "McHits" in blob
-        blob = time_preproc(blob,
-                            correct_hits=True,
-                            correct_mchits=correct_mchits)
+        if self.center_mchits is None:
+            self.center_mchits = "McHits" in blob
+
+        if self.add_t0:
+            blob = self.add_t0_time(blob)
+        blob = self.center_time(blob)
+
         return blob
 
-
-def time_preproc(blob, correct_hits=True, correct_mchits=True):
-    """
-    Preprocess the time in the blob.
-
-    t0 will be added to the time for real data, but not simulations.
-    Time hits and mchits will be shifted by the time of the first
-    triggered hit.
-
-    """
-    hits_time = blob["Hits"].time
-
-    if "McHits" not in blob:
-        # add t0 only for real data, not sims
+    def add_t0_time(self, blob):
+        if not self._t0_done:
+            print("Adding t0 to hit times")
+            self._t0_done = True
+        hits_time = blob["Hits"].time
         hits_t0 = blob["Hits"].t0
-        hits_time = np.add(hits_time, hits_t0)
+        blob["Hits"].time = np.add(hits_time, hits_t0)
 
-    hits_triggered = blob["Hits"].triggered
-    t_first_trigger = np.min(hits_time[hits_triggered == 1])
+        return blob
 
-    if correct_hits:
-        blob["Hits"].time = np.subtract(hits_time, t_first_trigger)
+    def center_time(self, blob):
+        hits_time = blob["Hits"].time
+        hits_triggered = blob["Hits"].triggered
+        t_first_trigger = np.min(hits_time[hits_triggered == 1])
 
-    if correct_mchits:
-        mchits_time = blob["McHits"].time
-        blob["McHits"].time = np.subtract(mchits_time, t_first_trigger)
+        if self.center_hits:
+            if not self._cent_hits_done:
+                print("Centering time of Hits")
+                self._cent_hits_done = True
+            blob["Hits"].time = np.subtract(hits_time, t_first_trigger)
 
-    return blob
+        if self.center_mchits:
+            if not self._cent_mchits_done:
+                print("Centering time of McHits")
+                self._cent_mchits_done = True
+            mchits_time = blob["McHits"].time
+            blob["McHits"].time = np.subtract(mchits_time, t_first_trigger)
+
+        return blob
 
 
 class ImageMaker(kp.Module):
