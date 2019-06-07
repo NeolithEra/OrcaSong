@@ -179,8 +179,8 @@ def plot_hist_of_files(save_as, files=None):
                 files.append(file)
 
     try:
+        print("Plotting stats of {} files".format(len(files)))
         for i, file in enumerate(files):
-            print("Plotting stats of {} files".format(len(files)))
             if i % 100 == 0:
                 print("File {}..." .format(i))
 
