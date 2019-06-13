@@ -186,7 +186,7 @@ class FileBinner:
             self.run(infile, outfile, save_plot=False)
 
         if save_plot:
-            plot_hist_of_files(outfiles, save_as=outfolder+"binning_hist.pdf")
+            plot_hist_of_files(files=outfiles, save_as=outfolder+"binning_hist.pdf")
 
     def build_pipe(self, infile, outfile):
         """

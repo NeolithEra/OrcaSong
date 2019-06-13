@@ -42,9 +42,9 @@ class TimePreproc(kp.Module):
     """
     Preprocess the time in the blob.
 
-    t0 can be added.
-    Time hits and mchits will be centered with the time of the first
+    Times of hits and mchits will be centered with the time of the first
     triggered hit.
+    Also, t0 can be added if desired.
 
     Attributes
     ----------
@@ -54,12 +54,13 @@ class TimePreproc(kp.Module):
     """
     def configure(self):
         self.add_t0 = self.require('add_t0')
+
         self.center_hits = True
         self.center_mchits = None
 
-        self._t0_done = False
-        self._cent_hits_done = False
-        self._cent_mchits_done = False
+        self._t0_flag = False
+        self._cent_hits_flag = False
+        self._cent_mchits_flag = False
 
     def process(self, blob):
         if self.center_mchits is None:
@@ -72,9 +73,9 @@ class TimePreproc(kp.Module):
         return blob
 
     def add_t0_time(self, blob):
-        if not self._t0_done:
+        if not self._t0_flag:
+            self._t0_flag = True
             print("Adding t0 to hit times")
-            self._t0_done = True
         hits_time = blob["Hits"].time
         hits_t0 = blob["Hits"].t0
         blob["Hits"].time = np.add(hits_time, hits_t0)
@@ -87,15 +88,15 @@ class TimePreproc(kp.Module):
         t_first_trigger = np.min(hits_time[hits_triggered == 1])
 
         if self.center_hits:
-            if not self._cent_hits_done:
+            if not self._cent_hits_flag:
                 print("Centering time of Hits")
-                self._cent_hits_done = True
+                self._cent_hits_flag = True
             blob["Hits"].time = np.subtract(hits_time, t_first_trigger)
 
         if self.center_mchits:
-            if not self._cent_mchits_done:
+            if not self._cent_mchits_flag:
                 print("Centering time of McHits")
-                self._cent_mchits_done = True
+                self._cent_mchits_flag = True
             mchits_time = blob["McHits"].time
             blob["McHits"].time = np.subtract(mchits_time, t_first_trigger)
 
