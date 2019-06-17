@@ -69,7 +69,7 @@ class TimePreproc(kp.Module):
 
         if self.add_t0:
             blob = self.add_t0_time(blob)
-        blob = self.center_time(blob)
+        blob = self.center_hittime(blob)
 
         return blob
 
@@ -83,7 +83,7 @@ class TimePreproc(kp.Module):
 
         return blob
 
-    def center_time(self, blob):
+    def center_hittime(self, blob):
         hits_time = blob["Hits"].time
         hits_triggered = blob["Hits"].triggered
         t_first_trigger = np.min(hits_time[hits_triggered == 1])
@@ -273,8 +273,25 @@ class DetApplier(kp.Module):
     """
     def configure(self):
         self.det_file = self.require("det_file")
+        self.assert_t0_is_added = self.get("check_t0", default=False)
+
         self.calib = kp.calib.Calibration(filename=self.det_file)
 
     def process(self, blob):
+        if self.assert_t0_is_added:
+            original_time = blob["Hits"].time
+
         blob = self.calib.process(blob, outkey="Hits")
+
+        if self.assert_t0_is_added:
+            actual_time = blob["Hits"].time
+            t0 = blob["Hits"].t0
+            target_time = np.add(original_time, t0)
+            if not np.array_equal(actual_time, target_time):
+                print(actual_time)
+                print(target_time)
+                raise AssertionError("t0 not added!")
+            else:
+                print("t0 was added ok")
+
         return blob
