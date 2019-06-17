@@ -42,16 +42,16 @@ class TimePreproc(kp.Module):
     """
     Preprocess the time in the blob.
 
+    Can add t0 to hit times.
     Times of hits and mchits can be centered with the time of the first
     triggered hit.
-    Also, t0 can be added if desired.
 
     Attributes
     ----------
-    center_time : bool
-        If true, center hit and mchit times.
     add_t0 : bool
         If true, t0 will be added.
+    center_time : bool
+        If true, center hit and mchit times.
 
     """
     def configure(self):

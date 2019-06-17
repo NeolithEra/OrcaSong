@@ -54,16 +54,16 @@ class FileBinner:
                  bin_edges_list,
                  mc_info_extr=None,
                  det_file=None,
-                 center_time=True,
                  add_t0=False,
+                 center_time=True,
                  event_skipper=None,
                  add_bin_stats=True):
         """
         Parameters
         ----------
         bin_edges_list : List
-            List with the names of the fields to bin, and the respective bin edges,
-            including the left- and right-most bin edge.
+            List with the names of the fields to bin, and the respective bin
+            edges, including the left- and right-most bin edge.
             Example: For 10 bins in the z direction, and 100 bins in time:
                 bin_edges_list = [
                     ["pos_z", np.linspace(0, 10, 11)],
@@ -76,12 +76,12 @@ class FileBinner:
         det_file : str, optional
             Path to a .detx detector geometry file, which can be used to
             calibrate the hits.
-        center_time : bool
-            Subtract time of first triggered hit from all hit times.
-            Will also be done for McHits if they are in the blob.
         add_t0 : bool
             If true, add t0 to the time of hits. If using a det_file,
             this will already have been done automatically.
+        center_time : bool
+            Subtract time of first triggered hit from all hit times.
+            Will also be done for McHits if they are in the blob.
         event_skipper : func, optional
             Function that takes the blob as an input, and returns a bool.
             If the bool is true, the blob will be skipped.
@@ -93,8 +93,8 @@ class FileBinner:
         self.bin_edges_list = bin_edges_list
         self.mc_info_extr = mc_info_extr
         self.det_file = det_file
-        self.center_time = center_time
         self.add_t0 = add_t0
+        self.center_time = center_time
         self.event_skipper = event_skipper
 
         if add_bin_stats:
@@ -107,7 +107,6 @@ class FileBinner:
 
         self.n_statusbar = 1000
         self.n_memory_observer = 1000
-
         self.chunksize = 32
         self.complib = 'zlib'
         self.complevel = 1
@@ -180,7 +179,8 @@ class FileBinner:
             self.run(infile, outfile, save_plot=False)
 
         if save_plot:
-            bs_plot.plot_hist_of_files(files=outfiles, save_as=outfolder+"binning_hist.pdf")
+            bs_plot.plot_hist_of_files(files=outfiles,
+                                       save_as=outfolder+"binning_hist.pdf")
 
     def build_pipe(self, infile, outfile):
         """
@@ -204,8 +204,8 @@ class FileBinner:
 
         if self.center_time or self.add_t0:
             pipe.attach(modules.TimePreproc,
-                        center_time=self.center_time,
-                        add_t0=self.add_t0)
+                        add_t0=self.add_t0,
+                        center_time=self.center_time)
 
         if self.event_skipper is not None:
             pipe.attach(modules.EventSkipper, event_skipper=self.event_skipper)
