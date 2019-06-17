@@ -2,16 +2,10 @@ import os
 import km3pipe as kp
 import km3modules as km
 
-from orcasong_2.modules import (DetApplier,
-                                TimePreproc,
-                                ImageMaker,
-                                McInfoMaker,
-                                BinningStatsMaker,
-                                EventSkipper)
+import orcasong_2.modules as modules
+import orcasong_2.util.bin_stats_plot as bs_plot
 from orcasong_2.mc_info_types import get_mc_info_extr
-from orcasong_2.util.bin_stats_plot import (plot_hists,
-                                            add_hists_to_h5file,
-                                            plot_hist_of_files)
+
 
 __author__ = 'Stefan Reck'
 
@@ -40,10 +34,6 @@ class FileBinner:
         Print a statusbar every n blobs.
     n_memory_observer : int, optional
         Print memory usage every n blobs.
-    do_time_preproc : bool
-        Do time preprocessing, i.e. add t0 only to real data, and subtract time
-        of first triggered hit.
-        Will also be done for McHits if they are in the blob.
     chunksize : int
         Chunksize (along axis_0) used for saving the output to a .h5 file.
     complib : str
@@ -64,6 +54,7 @@ class FileBinner:
                  bin_edges_list,
                  mc_info_extr=None,
                  det_file=None,
+                 center_time=True,
                  add_t0=False,
                  event_skipper=None,
                  add_bin_stats=True):
@@ -85,6 +76,9 @@ class FileBinner:
         det_file : str, optional
             Path to a .detx detector geometry file, which can be used to
             calibrate the hits.
+        center_time : bool
+            Subtract time of first triggered hit from all hit times.
+            Will also be done for McHits if they are in the blob.
         add_t0 : bool
             If true, add t0 to the time of hits. If using a det_file,
             this will already have been done automatically.
@@ -99,6 +93,7 @@ class FileBinner:
         self.bin_edges_list = bin_edges_list
         self.mc_info_extr = mc_info_extr
         self.det_file = det_file
+        self.center_time = center_time
         self.add_t0 = add_t0
         self.event_skipper = event_skipper
 
@@ -112,7 +107,6 @@ class FileBinner:
 
         self.n_statusbar = 1000
         self.n_memory_observer = 1000
-        self.do_time_preproc = True
 
         self.chunksize = 32
         self.complib = 'zlib'
@@ -151,11 +145,11 @@ class FileBinner:
 
         if self.bin_plot_freq is not None:
             hists = smry["BinningStatsMaker"]
-            add_hists_to_h5file(hists, outfile)
+            bs_plot.add_hists_to_h5file(hists, outfile)
 
             if save_plot:
                 save_as = os.path.splitext(outfile)[0] + "_hists.pdf"
-                plot_hists(hists, save_as)
+                bs_plot.plot_hists(hists, save_as)
 
     def run_multi(self, infiles, outfolder, save_plot=False):
         """
@@ -186,7 +180,7 @@ class FileBinner:
             self.run(infile, outfile, save_plot=False)
 
         if save_plot:
-            plot_hist_of_files(files=outfiles, save_as=outfolder+"binning_hist.pdf")
+            bs_plot.plot_hist_of_files(files=outfiles, save_as=outfolder+"binning_hist.pdf")
 
     def build_pipe(self, infile, outfile):
         """
@@ -206,20 +200,22 @@ class FileBinner:
                                           'McTracks', 'Hits', 'McHits'])
 
         if self.det_file:
-            pipe.attach(DetApplier, det_file=self.det_file)
+            pipe.attach(modules.DetApplier, det_file=self.det_file)
 
-        if self.do_time_preproc:
-            pipe.attach(TimePreproc, add_t0=self.add_t0)
+        if self.center_time or self.add_t0:
+            pipe.attach(modules.TimePreproc,
+                        center_time=self.center_time,
+                        add_t0=self.add_t0)
 
         if self.event_skipper is not None:
-            pipe.attach(EventSkipper, event_skipper=self.event_skipper)
+            pipe.attach(modules.EventSkipper, event_skipper=self.event_skipper)
 
         if self.bin_plot_freq is not None:
-            pipe.attach(BinningStatsMaker,
+            pipe.attach(modules.BinningStatsMaker,
                         bin_plot_freq=self.bin_plot_freq,
                         bin_edges_list=self.bin_edges_list)
 
-        pipe.attach(ImageMaker,
+        pipe.attach(modules.ImageMaker,
                     bin_edges_list=self.bin_edges_list,
                     store_as="histogram")
 
@@ -229,7 +225,7 @@ class FileBinner:
             else:
                 mc_info_extr = self.mc_info_extr
 
-            pipe.attach(McInfoMaker,
+            pipe.attach(modules.McInfoMaker,
                         mc_info_extr=mc_info_extr,
                         store_as="mc_info")
 

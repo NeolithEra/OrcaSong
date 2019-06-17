@@ -42,29 +42,30 @@ class TimePreproc(kp.Module):
     """
     Preprocess the time in the blob.
 
-    Times of hits and mchits will be centered with the time of the first
+    Times of hits and mchits can be centered with the time of the first
     triggered hit.
     Also, t0 can be added if desired.
 
     Attributes
     ----------
+    center_time : bool
+        If true, center hit and mchit times.
     add_t0 : bool
         If true, t0 will be added.
 
     """
     def configure(self):
         self.add_t0 = self.require('add_t0')
+        self.center_time = self.get('center_time', default=True)
 
-        self.center_hits = True
-        self.center_mchits = None
-
+        self.has_mchits = None
         self._t0_flag = False
         self._cent_hits_flag = False
         self._cent_mchits_flag = False
 
     def process(self, blob):
-        if self.center_mchits is None:
-            self.center_mchits = "McHits" in blob
+        if self.has_mchits is None:
+            self.has_mchits = "McHits" in blob
 
         if self.add_t0:
             blob = self.add_t0_time(blob)
@@ -87,13 +88,13 @@ class TimePreproc(kp.Module):
         hits_triggered = blob["Hits"].triggered
         t_first_trigger = np.min(hits_time[hits_triggered == 1])
 
-        if self.center_hits:
+        if self.center_time:
             if not self._cent_hits_flag:
                 print("Centering time of Hits")
                 self._cent_hits_flag = True
             blob["Hits"].time = np.subtract(hits_time, t_first_trigger)
 
-        if self.center_mchits:
+        if self.has_mchits:
             if not self._cent_mchits_flag:
                 print("Centering time of McHits")
                 self._cent_mchits_flag = True
@@ -272,27 +273,8 @@ class DetApplier(kp.Module):
     """
     def configure(self):
         self.det_file = self.require("det_file")
-        self._geo = None
+        self.calib = kp.calib.Calibration(filename=self.det_file)
 
     def process(self, blob):
-        if self._is_calibrated(blob):
-            warnings.warn("Warning: File has already been calibrated. "
-                          "Skipping calibration...")
-        else:
-            geo = self._load_geo()
-            hits = geo.apply(blob['Hits'])
-            blob['Hits'] = hits
+        blob = self.calib.process(blob, outkey="Hits")
         return blob
-
-    def _load_geo(self):
-        """ Load the detector geometry, and store it."""
-        if self._geo is None:
-            self._geo = kp.calib.Calibration(filename=self.det_file)
-        return self._geo
-
-    def _is_calibrated(self, blob):
-        """ True if calibration has been applied already. """
-        is_calibrated = False
-        if 'pos_x' in blob['Hits'] or "pos_y" in blob["Hits"]:
-            is_calibrated = True
-        return is_calibrated
